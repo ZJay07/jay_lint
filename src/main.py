@@ -1,4 +1,4 @@
-from src.lexing import lexing
+from src.lexing.logic import lexing
 
 print("hello world")
 lexing.FunctionRules().hello_world()
