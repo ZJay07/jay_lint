@@ -13,3 +13,4 @@ preloadsubincludes = ///python//build_defs:python
 
 [Plugin "python"]
 Target = //plugins:python
+ModuleDir = third_party.python
