@@ -77,6 +77,41 @@ class JayLinter(ast.NodeVisitor):
             lineno = next(node.lineno for node in ast.walk(ast.parse(self.source_code)) if isinstance(node, ast.Name) and node.id == var)
             self.messages.append(f"Variable '{var}' assigned on line {lineno} is not used.")
 
+    def check_empty_lines(self):
+        previous_line_empty = False
+        previous_line_was_import = False
+        previous_line_was_function = False
+
+        for i, line in enumerate(self.source_lines, start=1):
+            stripped_line = line.strip()
+            if stripped_line == '':
+                previous_line_empty = True
+                continue
+
+            if previous_line_empty:
+                previous_line_empty = False
+                if previous_line_was_import and not stripped_line.startswith(('import ', 'from ')):
+                    previous_line_was_import = False
+                    continue
+
+                if previous_line_was_function and not stripped_line.startswith('def '):
+                    previous_line_was_function = False
+                    continue
+
+                self.messages.append(f"Line {i} should be empty.")
+            else:
+                if stripped_line.startswith(('import ', 'from ')):
+                    previous_line_was_import = True
+                elif stripped_line.startswith('def '):
+                    previous_line_was_function = True
+                elif not previous_line_was_function and not previous_line_was_import:
+                    self.messages.append(f"Line {i} should be empty.")
+    
+        # Check if the last line is not empty
+        if self.source_lines and self.source_lines[-1].strip() != '':
+            self.messages.append("File should end with an empty line.")
+
+
     def lint(self):
         tree = ast.parse(self.source_code)
         self.visit(tree)
@@ -85,5 +120,5 @@ class JayLinter(ast.NodeVisitor):
         self.check_unused_imports()
         self.check_unused_function_args()
         self.check_unused_variables()
+        self.check_empty_lines()
         return self.messages
-
