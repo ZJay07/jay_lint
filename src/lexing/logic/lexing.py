@@ -36,10 +36,18 @@ class JayLinter(ast.NodeVisitor):
         sorted_imports = sorted(self.import_lines, key=lambda x: x[0])
         if self.import_lines != sorted_imports:
             self.messages.append("Imports are not in lexicographical order.")
+    
+    def check_trailing_whitespace(self):
+        for i, line in enumerate(self.source_lines, start=1):
+            if line.endswith(' '):
+                self.messages.append(f"Line {i} has trailing whitespace.")
+            if line == '':
+                self.messages.append(f"Line {i} is empty.")
 
     def lint(self):
         tree = ast.parse(self.source_code)
         self.visit(tree)
         self.check_import_order()
+        self.check_trailing_whitespace()
         return self.messages
 

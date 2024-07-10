@@ -5,14 +5,6 @@ python_library (
     deps = ["//third_party/python:pytest" , "//third_party/python:pluggy", "//third_party/python:iniconfig"],
 )
 
-# python_test(
-#     name = "test_lexer",
-#     srcs = ["test/lexing_test.py"],
-#     deps = [
-#         ":lexing",
-#     ],
-# )
-
 python_test(
     name = "test_comment",
     srcs = ["test/test_comments.py"],
@@ -24,6 +16,14 @@ python_test(
 python_test(
     name = "test_imports",
     srcs = ["test/test_imports.py"],
+    deps = [
+        ":lexing",
+    ],
+)
+
+python_test(
+    name = "test_trailing_white_spaces",
+    srcs = ["test/test_trailing_white_spaces.py"],
     deps = [
         ":lexing",
     ],
