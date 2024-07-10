@@ -6,8 +6,32 @@ python_library (
 )
 
 python_test(
-    name = "test_lexer",
-    srcs = ["test/lexing_test.py"],
+    name = "test_comment",
+    srcs = ["test/test_comments.py"],
+    deps = [
+        ":lexing",
+    ],
+)
+
+python_test(
+    name = "test_imports",
+    srcs = ["test/test_imports.py"],
+    deps = [
+        ":lexing",
+    ],
+)
+
+python_test(
+    name = "test_trailing_white_spaces",
+    srcs = ["test/test_trailing_white_spaces.py"],
+    deps = [
+        ":lexing",
+    ],
+)
+
+python_test(
+    name = "test_variables",
+    srcs = ["test/test_variables.py"],
     deps = [
         ":lexing",
     ],
