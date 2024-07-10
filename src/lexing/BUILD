@@ -20,3 +20,11 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "test_imports",
+    srcs = ["test/test_imports.py"],
+    deps = [
+        ":lexing",
+    ],
+)
