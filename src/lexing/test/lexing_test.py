@@ -61,6 +61,16 @@ import os
 import sys
 """, True)  # This should pass the import order check
     ]
+    TEST_TRAILING_WHITE_SPACE = [
+        ("""
+def function_without_trailing_whitespace():
+         return True
+""", False),  # This should fail the import order check
+        ("""
+def function_with_trailing_whitespace(): 
+         return False
+""", True)  # This should pass the import order check
+    ]
 
     def test_function_comment(self):
         for source_code, expected in self.TEST_DATA_COMMENT:
@@ -115,6 +125,15 @@ import sys
             linter.visit(tree)
             linter.finalize()
             self.assertEqual("Imports are not in lexicographical order." not in linter.messages, expected)
+    
+    def test_trailing_white_space(self):
+        for source_code, expected in self.TEST_TRAILING_WHITE_SPACE:
+            source_lines = source_code.strip().splitlines()
+            linter = FunctionArgLinter(max_args=4, source_lines=source_lines)
+            tree = ast.parse(source_code)
+            linter.visit(tree)
+            print(linter.messages)
+            self.assertEqual("Line 1 has trailing whitespace." in linter.messages, expected)
 
 if __name__ == '__main__':
     unittest.main()
