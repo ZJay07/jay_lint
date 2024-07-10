@@ -38,6 +38,15 @@ from b import x
         """
         messages = self.lint_code(code)
         self.assertIn("Imports are not in lexicographical order.", messages)
+    
+    def test_unused_import(self):
+        code = """
+import a
+import b
+a = 1
+        """
+        messages = self.lint_code(code)
+        self.assertIn("Import 'b' on line 3 is not used.", messages)
 
 if __name__ == '__main__':
     unittest.main()

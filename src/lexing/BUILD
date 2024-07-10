@@ -28,3 +28,11 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "test_variables",
+    srcs = ["test/test_variables.py"],
+    deps = [
+        ":lexing",
+    ],
+)
