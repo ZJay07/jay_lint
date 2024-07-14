@@ -1,3 +1,3 @@
-from src.lexing.logic import lexing
+from src.lexing.logic.lexing import JayLinter
 
 print("hello")
