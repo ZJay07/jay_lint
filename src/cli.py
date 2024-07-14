@@ -5,7 +5,6 @@ from pathlib import Path
 
 from src.lexing.logic.lexing import JayLinter
 
-print(f"sys.path: {sys.path}")
 def main():
     parser = argparse.ArgumentParser(description='Python Function Comment Linter')
     parser.add_argument('file', type=str, help='Python file to lint')
