@@ -3,3 +3,9 @@ python_binary(
     main = "main.py",
     deps = ["//src/lexing"],
 )
+
+python_library (
+    name = "cli",
+    srcs = ["cli.py"],
+    visibility= ["//Jay_lint/..."],
+)

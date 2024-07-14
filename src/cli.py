@@ -1,41 +1,39 @@
 import argparse
-import ast
 import os
 import sys
-from src.lexing.logic.lexing import FunctionArgLinter
+from pathlib import Path
 
-green_start = "\033[92m"
+from src.lexing.logic.lexing import JayLinter
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='A custom Python linter')
-    parser.add_argument('filepath', type=str, help='Path to the Python file to lint')
-    parser.add_argument('--max-args', type=int, default=4, help='Maximum allowed number of arguments in functions')
-    parser.add_argument('--max-line-length', type=int, default=79, help='Maximum allowed line length')
-    return parser.parse_args()
-
+print(f"sys.path: {sys.path}")
 def main():
-    args = parse_arguments()
-    filepath = args.filepath
+    parser = argparse.ArgumentParser(description='Python Function Comment Linter')
+    parser.add_argument('file', type=str, help='Python file to lint')
 
-    if not os.path.isfile(filepath):
-        print(f"Error: File '{filepath}' not found.")
+    args = parser.parse_args()
+
+    file_path = Path(args.file)
+
+    if not file_path.exists():
+        print(f"Error: File '{args.file}' not found.")
         return
 
-    with open(filepath, 'r') as file:
-        source_code = file.read()
+    if not file_path.is_file() or not file_path.suffix == '.py':
+        print(f"Error: '{args.file}' is not a valid Python file.")
+        return
 
-    source_lines = source_code.splitlines()
-    linter = FunctionArgLinter(max_args=args.max_args, source_lines=source_lines, max_line_length=args.max_line_length)
-    tree = ast.parse(source_code)
-    linter.visit(tree)
-    linter.check_line_length()
-    linter.finalize()
+    with open(file_path, 'r', encoding='utf-8') as f:
+        source_code = f.read()
 
-    if linter.messages:
-        for message in linter.messages:
-            print(message)
+    linter = JayLinter(source_code)
+    messages = linter.lint()
+
+    if messages:
+        print("Linting results:")
+        for message in messages:
+            print(f"- {message}")
     else:
-        print(f"{green_start}No issues found in '{filepath}'.")
+        print("No issues found.")
 
 if __name__ == '__main__':
     main()
