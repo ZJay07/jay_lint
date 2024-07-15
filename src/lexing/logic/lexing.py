@@ -55,7 +55,7 @@ class JayLinter(ast.NodeVisitor):
         for i, line in enumerate(self.source_lines, start=1):
             if line.rstrip() != line:
                 self.messages.append(f"Line {i} has trailing whitespace.")
-            if line == '':
+            if line == '' and i != 1:
                 self.messages.append(f"Line {i} is empty.")
 
     def check_unused_imports(self):
@@ -103,14 +103,22 @@ class JayLinter(ast.NodeVisitor):
                 if stripped_line.startswith(('import ', 'from ')):
                     previous_line_was_import = True
                 elif stripped_line.startswith('def '):
+                    if previous_line_was_function:
+                        self.messages.append(f"Line {i-1} should be empty between functions.")
                     previous_line_was_function = True
                 elif not previous_line_was_function and not previous_line_was_import:
                     self.messages.append(f"Line {i} should be empty.")
-    
+
         # Check if the last line is not empty
         if self.source_lines and self.source_lines[-1].strip() != '':
             self.messages.append("File should end with an empty line.")
 
+
+    def check_first_line_empty(self):
+        if not self.source_lines:
+            return
+        if self.source_lines[0].strip() == '':
+            self.messages.append("The first line is empty.")
 
     def lint(self):
         tree = ast.parse(self.source_code)
@@ -120,5 +128,6 @@ class JayLinter(ast.NodeVisitor):
         self.check_unused_imports()
         self.check_unused_function_args()
         self.check_unused_variables()
+        self.check_first_line_empty()
         self.check_empty_lines()
         return self.messages
