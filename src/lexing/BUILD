@@ -36,3 +36,11 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "naming_convention",
+    srcs = ["test/naming_conventions.py"],
+    deps = [
+        ":lexing",
+    ],
+)

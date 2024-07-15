@@ -1,5 +1,6 @@
 import ast
 import tokenize
+import re
 from io import BytesIO
 
 class JayLinter(ast.NodeVisitor):
@@ -119,6 +120,28 @@ class JayLinter(ast.NodeVisitor):
             return
         if self.source_lines[0].strip() == '':
             self.messages.append("The first line is empty.")
+    
+    def check_case_conventions(self):
+        lower_camel_case_pattern = re.compile(r'^[a-z]+([A-Z][a-z0-9]*)*$')
+        upper_camel_case_pattern = re.compile(r'^[A-Z][a-z0-9]*([A-Z][a-z0-9]*)*$')
+
+        def is_lower_camel_case(name):
+            return bool(lower_camel_case_pattern.match(name))
+
+        def is_upper_camel_case(name):
+            return bool(upper_camel_case_pattern.match(name))
+
+        for i, line in enumerate(self.source_lines, start=1):
+            stripped_line = line.strip()
+            if stripped_line.startswith('def '):
+                method_name = stripped_line.split()[1].split('(')[0]
+                if not is_lower_camel_case(method_name):
+                    self.messages.append(f"Line {i}: Method '{method_name}' should use lower camel case.")
+
+            if stripped_line.startswith('class '):
+                class_name = stripped_line.split()[1].split('(')[0]
+                if not is_upper_camel_case(class_name):
+                    self.messages.append(f"Line {i}: Class '{class_name}' should use upper camel case.")
 
     def lint(self):
         tree = ast.parse(self.source_code)
@@ -130,4 +153,5 @@ class JayLinter(ast.NodeVisitor):
         self.check_unused_variables()
         self.check_first_line_empty()
         self.check_empty_lines()
+        self.check_case_conventions()
         return self.messages
