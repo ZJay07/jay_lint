@@ -39,7 +39,15 @@ python_test(
 
 python_test(
     name = "naming_convention",
-    srcs = ["test/naming_conventions.py"],
+    srcs = ["test/test_naming_conventions.py"],
+    deps = [
+        ":lexing",
+    ],
+)
+
+python_test(
+    name = "line_length",
+    srcs = ["test/test_line_length.py"],
     deps = [
         ":lexing",
     ],
