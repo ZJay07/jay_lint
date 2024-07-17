@@ -13,6 +13,8 @@ class JayLinter(ast.NodeVisitor):
         self.imported_names = set()
         self.used_names = set()
         self.function_args = {}
+        self.unused_imports = set()
+        self.unused_variables = set()
 
     def _has_preceding_comment(self, func_lineno):
         for token in self.tokens:
@@ -60,8 +62,8 @@ class JayLinter(ast.NodeVisitor):
                 self.messages.append(f"Line {i} is empty.")
 
     def check_unused_imports(self):
-        unused_imports = self.imported_names - self.used_names
-        for name in unused_imports:
+        self.unused_imports = self.imported_names - self.used_names
+        for name in self.unused_imports:
             lineno = next(line for (imp, line) in self.import_lines if imp == name)
             self.messages.append(f"Import '{name}' on line {lineno} is not used.")
 
@@ -73,8 +75,8 @@ class JayLinter(ast.NodeVisitor):
 
     def check_unused_variables(self):
         assigned_names = {node.id for node in ast.walk(ast.parse(self.source_code)) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)}
-        unused_vars = assigned_names - self.used_names
-        for var in unused_vars:
+        self.unused_variables = assigned_names - self.used_names
+        for var in self.unused_variables:
             lineno = next(node.lineno for node in ast.walk(ast.parse(self.source_code)) if isinstance(node, ast.Name) and node.id == var)
             self.messages.append(f"Variable '{var}' assigned on line {lineno} is not used.")
 
@@ -114,7 +116,6 @@ class JayLinter(ast.NodeVisitor):
         if self.source_lines and self.source_lines[-1].strip() != '':
             self.messages.append("File should end with an empty line.")
 
-
     def check_first_line_empty(self):
         if not self.source_lines:
             return
@@ -148,7 +149,38 @@ class JayLinter(ast.NodeVisitor):
         for i, line in enumerate(self.source_lines, start=1):
             if len(line) > max_length:
                 self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
+    
+    def remove_unused_code(self):
+        updated_lines = []
+        tree = ast.parse(self.source_code)
+        
+        # Identify lines to keep by analyzing the AST
+        used_import_lines = {node.lineno for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))}
+        used_assignments = {node.lineno for node in ast.walk(tree) if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id not in self.unused_variables for target in node.targets)}
 
+        for i, line in enumerate(self.source_lines, start=1):
+            # Skip unused import lines
+            if i in used_import_lines:
+                if any(name in line for name in self.unused_imports):
+                    continue
+            # Handle unused variable assignments
+            if i in used_assignments:
+                targets = [target.id for target in ast.walk(ast.parse(line)) if isinstance(target, ast.Name)]
+                if any(var in targets for var in self.unused_variables):
+                    continue
+            updated_lines.append(line)
+
+        # Handle function parameters with unused variables
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                unused_args = self.function_args[node.name] - self.used_names
+                if unused_args:
+                    function_line = self.source_lines[node.lineno - 1]
+                    pattern = r'\b(' + '|'.join(unused_args) + r')\b\s*,?'
+                    new_function_line = re.sub(pattern, '', function_line)
+                    updated_lines[node.lineno - 1] = new_function_line.strip(' ,')
+
+        self.source_lines = updated_lines
 
     def lint(self):
         tree = ast.parse(self.source_code)
@@ -163,3 +195,8 @@ class JayLinter(ast.NodeVisitor):
         self.check_case_conventions()
         self.check_line_length()
         return self.messages
+    
+    def fix(self):
+        self.lint()  # Ensure all checks are run and data is populated
+        self.remove_unused_code()
+
