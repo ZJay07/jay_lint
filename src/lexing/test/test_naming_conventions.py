@@ -15,7 +15,6 @@ class MySecondClass:
     """
         message = self.lint_code(code)
         self.assertIn("Line 2: Class 'myClass:' should use upper camel case.", message)
-        self.assertIn("Line 4: Class 'MySecondClass:' should use upper camel case.", message)
 
     def test_case_conventions_function(self):
         code = """

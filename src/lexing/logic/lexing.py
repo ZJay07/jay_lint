@@ -123,7 +123,7 @@ class JayLinter(ast.NodeVisitor):
     
     def check_case_conventions(self):
         lower_camel_case_pattern = re.compile(r'^[a-z]+([A-Z][a-z0-9]*)*$')
-        upper_camel_case_pattern = re.compile(r'^[A-Z][a-z0-9]*([A-Z][a-z0-9]*)*$')
+        upper_camel_case_pattern = re.compile(r'^[A-Z]([A-Z0-9]*[a-z][a-z0-9]*[A-Z]|[a-z0-9]*[A-Z][A-Z0-9]*[a-z])[A-Za-z0-9]*$')
 
         def is_lower_camel_case(name):
             return bool(lower_camel_case_pattern.match(name))
@@ -142,6 +142,13 @@ class JayLinter(ast.NodeVisitor):
                 class_name = stripped_line.split()[1].split('(')[0]
                 if not is_upper_camel_case(class_name):
                     self.messages.append(f"Line {i}: Class '{class_name}' should use upper camel case.")
+        
+    def check_line_length(self):
+        max_length = 100
+        for i, line in enumerate(self.source_lines, start=1):
+            if len(line) > max_length:
+                self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
+
 
     def lint(self):
         tree = ast.parse(self.source_code)
@@ -154,4 +161,5 @@ class JayLinter(ast.NodeVisitor):
         self.check_first_line_empty()
         self.check_empty_lines()
         self.check_case_conventions()
+        self.check_line_length()
         return self.messages
