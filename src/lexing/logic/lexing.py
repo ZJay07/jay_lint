@@ -149,38 +149,44 @@ class JayLinter(ast.NodeVisitor):
         for i, line in enumerate(self.source_lines, start=1):
             if len(line) > max_length:
                 self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
-    
-    def remove_unused_code(self):
-        updated_lines = []
-        tree = ast.parse(self.source_code)
-        
-        # Identify lines to keep by analyzing the AST
-        used_import_lines = {node.lineno for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))}
-        used_assignments = {node.lineno for node in ast.walk(tree) if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id not in self.unused_variables for target in node.targets)}
 
-        for i, line in enumerate(self.source_lines, start=1):
-            # Skip unused import lines
-            if i in used_import_lines:
-                if any(name in line for name in self.unused_imports):
-                    continue
-            # Handle unused variable assignments
-            if i in used_assignments:
-                targets = [target.id for target in ast.walk(ast.parse(line)) if isinstance(target, ast.Name)]
-                if any(var in targets for var in self.unused_variables):
-                    continue
-            updated_lines.append(line)
+    def remove_unused_code(self):
+        updated_lines = self.source_lines.copy()  # Work on a copy of the source lines
+        tree = ast.parse(self.source_code)
 
         # Handle function parameters with unused variables
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
-                unused_args = self.function_args[node.name] - self.used_names
+                unused_args = set(self.function_args.get(node.name, [])) - self.used_names
                 if unused_args:
-                    function_line = self.source_lines[node.lineno - 1]
-                    pattern = r'\b(' + '|'.join(unused_args) + r')\b\s*,?'
-                    new_function_line = re.sub(pattern, '', function_line)
-                    updated_lines[node.lineno - 1] = new_function_line.strip(' ,')
+                    function_line = updated_lines[node.lineno - 1]
+                    for arg in unused_args:
+                        function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
+                    function_line = re.sub(r',\s*\)', ')', function_line)
+                    updated_lines[node.lineno - 1] = function_line
+
+        # Mark unused imports and assignments for removal
+        lines_to_remove = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                if any(alias.name in self.unused_imports for alias in node.names):
+                    lines_to_remove.add(node.lineno - 1)
+            elif isinstance(node, ast.Assign):
+                targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
+                if all(var in self.unused_variables for var in targets):
+                    lines_to_remove.add(node.lineno - 1)
+
+        # Remove marked lines, ensuring no essential lines are removed
+        for lineno in sorted(lines_to_remove, reverse=True):
+            if 0 <= lineno < len(updated_lines):
+                if updated_lines[lineno].strip().startswith('import') or re.match(r'^\s*\w+\s*=\s*', updated_lines[lineno]):
+                    del updated_lines[lineno]
+
+        # Clean up any resulting empty lines
+        updated_lines = [line for line in updated_lines if line.strip() != '']
 
         self.source_lines = updated_lines
+        return "\n".join(updated_lines)
 
     def lint(self):
         tree = ast.parse(self.source_code)

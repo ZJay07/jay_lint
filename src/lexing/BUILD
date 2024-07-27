@@ -52,3 +52,11 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "fix_unused_args",
+    srcs = ["test/test_fix_unused_args.py"],
+    deps = [
+        ":lexing",
+    ],
+)
