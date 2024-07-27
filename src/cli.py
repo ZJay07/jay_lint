@@ -1,13 +1,20 @@
 import argparse
-import os
-import sys
 from pathlib import Path
 
 from src.lexing.logic.lexing import JayLinter
 
+def read_source_file(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+def write_source_file(file_path, source_code):
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(source_code)
+
 def main():
     parser = argparse.ArgumentParser(description='Python Function Comment Linter')
     parser.add_argument('file', type=str, help='Python file to lint')
+    parser.add_argument('--fix', action='store_true', help="Automatically fix the code")
 
     args = parser.parse_args()
 
@@ -21,18 +28,22 @@ def main():
         print(f"Error: '{args.file}' is not a valid Python file.")
         return
 
-    with open(file_path, 'r', encoding='utf-8') as f:
-        source_code = f.read()
+    source_code = read_source_file(file_path)
 
     linter = JayLinter(source_code)
-    messages = linter.lint()
 
-    if messages:
-        print("Linting results:")
-        for message in messages:
-            print(f"- {message}")
+    if args.fix:
+        linter.fix()
+        write_source_file(file_path, '\n'.join(linter.source_lines))
+        print(f"Fixed and saved the file: {args.file}")
     else:
-        print("No issues found.")
+        messages = linter.lint()
+        if messages:
+            print("Linting results:")
+            for message in messages:
+                print(f"- {message}")
+        else:
+            print("No issues found.")
 
 if __name__ == '__main__':
     main()

@@ -13,6 +13,8 @@ class JayLinter(ast.NodeVisitor):
         self.imported_names = set()
         self.used_names = set()
         self.function_args = {}
+        self.unused_imports = set()
+        self.unused_variables = set()
 
     def _has_preceding_comment(self, func_lineno):
         for token in self.tokens:
@@ -60,8 +62,8 @@ class JayLinter(ast.NodeVisitor):
                 self.messages.append(f"Line {i} is empty.")
 
     def check_unused_imports(self):
-        unused_imports = self.imported_names - self.used_names
-        for name in unused_imports:
+        self.unused_imports = self.imported_names - self.used_names
+        for name in self.unused_imports:
             lineno = next(line for (imp, line) in self.import_lines if imp == name)
             self.messages.append(f"Import '{name}' on line {lineno} is not used.")
 
@@ -73,8 +75,8 @@ class JayLinter(ast.NodeVisitor):
 
     def check_unused_variables(self):
         assigned_names = {node.id for node in ast.walk(ast.parse(self.source_code)) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)}
-        unused_vars = assigned_names - self.used_names
-        for var in unused_vars:
+        self.unused_variables = assigned_names - self.used_names
+        for var in self.unused_variables:
             lineno = next(node.lineno for node in ast.walk(ast.parse(self.source_code)) if isinstance(node, ast.Name) and node.id == var)
             self.messages.append(f"Variable '{var}' assigned on line {lineno} is not used.")
 
@@ -114,7 +116,6 @@ class JayLinter(ast.NodeVisitor):
         if self.source_lines and self.source_lines[-1].strip() != '':
             self.messages.append("File should end with an empty line.")
 
-
     def check_first_line_empty(self):
         if not self.source_lines:
             return
@@ -149,6 +150,43 @@ class JayLinter(ast.NodeVisitor):
             if len(line) > max_length:
                 self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
 
+    def remove_unused_code(self):
+        updated_lines = self.source_lines.copy()  # Work on a copy of the source lines
+        tree = ast.parse(self.source_code)
+
+        # Handle function parameters with unused variables
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                unused_args = set(self.function_args.get(node.name, [])) - self.used_names
+                if unused_args:
+                    function_line = updated_lines[node.lineno - 1]
+                    for arg in unused_args:
+                        function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
+                    function_line = re.sub(r',\s*\)', ')', function_line)
+                    updated_lines[node.lineno - 1] = function_line
+
+        # Mark unused imports and assignments for removal
+        lines_to_remove = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                if any(alias.name in self.unused_imports for alias in node.names):
+                    lines_to_remove.add(node.lineno - 1)
+            elif isinstance(node, ast.Assign):
+                targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
+                if all(var in self.unused_variables for var in targets):
+                    lines_to_remove.add(node.lineno - 1)
+
+        # Remove marked lines, ensuring no essential lines are removed
+        for lineno in sorted(lines_to_remove, reverse=True):
+            if 0 <= lineno < len(updated_lines):
+                if updated_lines[lineno].strip().startswith('import') or re.match(r'^\s*\w+\s*=\s*', updated_lines[lineno]):
+                    del updated_lines[lineno]
+
+        # Clean up any resulting empty lines
+        updated_lines = [line for line in updated_lines if line.strip() != '']
+
+        self.source_lines = updated_lines
+        return "\n".join(updated_lines)
 
     def lint(self):
         tree = ast.parse(self.source_code)
@@ -163,3 +201,8 @@ class JayLinter(ast.NodeVisitor):
         self.check_case_conventions()
         self.check_line_length()
         return self.messages
+    
+    def fix(self):
+        self.lint()  # Ensure all checks are run and data is populated
+        self.remove_unused_code()
+
