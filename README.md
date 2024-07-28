@@ -9,3 +9,14 @@ pip install .
 
 # How to use?
 After installing, simply run `jays-linter` followed by your file name.
+eg:
+```bash
+jays-linter <test.py>
+```
+
+# How to use 'fix'?
+Same as before, just add `--fix` after the file name
+eg:
+```bash
+jays-linter --fix <test.py>
+```
