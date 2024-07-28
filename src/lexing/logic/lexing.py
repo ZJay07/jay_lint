@@ -1,7 +1,8 @@
 import ast
+import sys
 import tokenize
-import re
 from io import BytesIO
+import re
 
 class JayLinter(ast.NodeVisitor):
     def __init__(self, source_code):
@@ -151,42 +152,110 @@ class JayLinter(ast.NodeVisitor):
                 self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
 
     def remove_unused_code(self):
-        updated_lines = self.source_lines.copy()  # Work on a copy of the source lines
+        updated_lines = self.source_lines.copy()
         tree = ast.parse(self.source_code)
 
-        # Handle function parameters with unused variables
+        # Remove unused function arguments
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
+                function_line = updated_lines[node.lineno - 1]
                 unused_args = set(self.function_args.get(node.name, [])) - self.used_names
                 if unused_args:
-                    function_line = updated_lines[node.lineno - 1]
                     for arg in unused_args:
                         function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
-                    function_line = re.sub(r',\s*\)', ')', function_line)
+                    function_line = re.sub(r',\s*\)', ')', function_line)  # Remove trailing commas
+                    function_line = re.sub(r'\(\s*,', '(', function_line)  # Remove leading commas
                     updated_lines[node.lineno - 1] = function_line
 
-        # Mark unused imports and assignments for removal
-        lines_to_remove = set()
+        # Remove lines with unused imports
+        for i, line in enumerate(updated_lines):
+            if line.strip().startswith(('import ', 'from ')):
+                parts = line.split()
+                if len(parts) < 2:
+                    continue  # Skip lines that don't match expected format
+                if parts[0] == 'import':
+                    import_name = parts[1]
+                elif parts[0] == 'from' and len(parts) >= 4:
+                    import_name = f"{parts[1]}.{parts[3]}"
+                else:
+                    continue  # Skip lines that don't match expected format
+                
+                if import_name in self.unused_imports:
+                    updated_lines[i] = ''  # Remove the entire line
+
+        # Remove assignments of unused variables
         for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                if any(alias.name in self.unused_imports for alias in node.names):
-                    lines_to_remove.add(node.lineno - 1)
-            elif isinstance(node, ast.Assign):
-                targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
-                if all(var in self.unused_variables for var in targets):
-                    lines_to_remove.add(node.lineno - 1)
+            if isinstance(node, ast.Assign):
+                assigned_vars = {target.id for target in node.targets if isinstance(target, ast.Name)}
+                if assigned_vars.issubset(self.unused_variables):
+                    updated_lines[node.lineno - 1] = ''
 
-        # Remove marked lines, ensuring no essential lines are removed
-        for lineno in sorted(lines_to_remove, reverse=True):
-            if 0 <= lineno < len(updated_lines):
-                if updated_lines[lineno].strip().startswith('import') or re.match(r'^\s*\w+\s*=\s*', updated_lines[lineno]):
-                    del updated_lines[lineno]
+        # Ensure proper blank lines between functions and after imports
+        final_lines = []
+        previous_line_was_function = False
 
-        # Clean up any resulting empty lines
-        updated_lines = [line for line in updated_lines if line.strip() != '']
+        for i, line in enumerate(updated_lines):
+            stripped_line = line.strip()
+            if stripped_line == '':
+                if not previous_line_was_function:
+                    continue  # Skip adding blank lines if the previous line wasn't a function
+            else:
+                if stripped_line.startswith(('def ', 'class ')):
+                    if previous_line_was_function:
+                        final_lines.append('')  # Ensure one blank line before functions
+                    previous_line_was_function = True
+                else:
+                    previous_line_was_function = False
+            final_lines.append(line)
 
-        self.source_lines = updated_lines
-        return "\n".join(updated_lines)
+        # Remove trailing blank lines
+        while final_lines and final_lines[-1].strip() == '':
+            final_lines.pop()
+
+        self.source_lines = final_lines
+        self.source_code = "\n".join(self.source_lines).strip()
+        self.reorder_imports()
+
+        return self.source_code
+
+
+    def reorder_imports(self):
+        stdlib_imports, third_party_imports, local_imports = [], [], []
+        for line in self.source_lines:
+            if line.startswith(('import ', 'from ')):
+                if self.is_standard_library_import(line):
+                    stdlib_imports.append(line)
+                elif self.is_third_party_import(line):
+                    third_party_imports.append(line)
+                else:
+                    local_imports.append(line)
+
+        ordered_imports = (
+            sorted(stdlib_imports) +
+            ([""] if stdlib_imports and third_party_imports else []) +
+            sorted(third_party_imports) +
+            ([""] if third_party_imports and local_imports else []) +
+            sorted(local_imports)
+        )
+
+        non_import_lines = [line for line in self.source_lines if not line.strip().startswith(('import ', 'from '))]
+        
+        self.source_lines = ordered_imports + [''] + non_import_lines
+        self.source_code = "\n".join(self.source_lines).strip()
+        return self.source_code
+
+    def is_standard_library_import(self, import_line):
+        stdlib_module_names = set(sys.stdlib_module_names)
+        for module in stdlib_module_names:
+            if import_line.startswith(f'import {module}') or import_line.startswith(f'from {module}'):
+                return True
+        return False
+
+    def is_third_party_import(self, import_line):
+        return not self.is_standard_library_import(import_line) and not self.is_local_import(import_line)
+
+    def is_local_import(self, import_line):
+        return 'local_module' in import_line  # Assuming 'local_module' is a placeholder for actual local module names
 
     def lint(self):
         tree = ast.parse(self.source_code)
@@ -205,4 +274,3 @@ class JayLinter(ast.NodeVisitor):
     def fix(self):
         self.lint()  # Ensure all checks are run and data is populated
         self.remove_unused_code()
-

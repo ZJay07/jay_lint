@@ -60,3 +60,19 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "reorder_imports",
+    srcs = ["test/test_reorder_imports.py"],
+    deps = [
+        ":lexing",
+    ],
+)
+
+python_test(
+    name = "unused_reorder_imports",
+    srcs = ["test/test_unused_reorder_imports.py"],
+    deps = [
+        ":lexing",
+    ],
+)
