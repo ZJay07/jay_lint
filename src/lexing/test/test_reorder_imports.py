@@ -27,6 +27,7 @@ import thirdparty
 
 from local import local_module
 
+
 def my_function():
     return "Hello, World!"
 """
@@ -52,6 +53,7 @@ import thirdparty
 
 from local import local_module
 
+
 def my_function():
     return "Hello, World!"
 """
@@ -75,6 +77,7 @@ import sys
 import thirdparty
 
 from . import local_module
+
 
 def my_function():
     return "Hello, World!"

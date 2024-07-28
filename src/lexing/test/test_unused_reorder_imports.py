@@ -53,6 +53,7 @@ def another_function(unused_param, used_param):
         expected_fixed_code = """
 import os
 
+
 def hello(used_arg):
     os.path.join()
     return used_arg
@@ -81,6 +82,7 @@ def another_func():
 """
         expected_fixed_code = """
 import thirdparty
+
 
 def mixed_func(used_arg1, used_arg2):
     thirdparty.some_function()

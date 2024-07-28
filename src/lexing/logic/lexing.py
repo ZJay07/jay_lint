@@ -190,34 +190,56 @@ class JayLinter(ast.NodeVisitor):
                 if assigned_vars.issubset(self.unused_variables):
                     updated_lines[node.lineno - 1] = ''
 
-        # Ensure proper blank lines between functions and after imports
-        final_lines = []
-        previous_line_was_function = False
+        # Apply formatting for blank lines
+        formatted_lines = self.ensure_blank_lines_between_functions(updated_lines)
 
-        for i, line in enumerate(updated_lines):
-            stripped_line = line.strip()
-            if stripped_line == '':
-                if not previous_line_was_function:
-                    continue  # Skip adding blank lines if the previous line wasn't a function
-            else:
-                if stripped_line.startswith(('def ', 'class ')):
-                    if previous_line_was_function:
-                        final_lines.append('')  # Ensure one blank line before functions
-                    previous_line_was_function = True
-                else:
-                    previous_line_was_function = False
-            final_lines.append(line)
-
-        # Remove trailing blank lines
-        while final_lines and final_lines[-1].strip() == '':
-            final_lines.pop()
-
-        self.source_lines = final_lines
+        self.source_lines = formatted_lines
         self.source_code = "\n".join(self.source_lines).strip()
         self.reorder_imports()
 
         return self.source_code
+    
+    def ensure_blank_lines_between_functions(self, lines):
+        """
+        Ensures there is exactly one blank line between top-level function and class definitions,
+        and two blank lines after imports (if any) before the first function or class.
+        """
+        formatted_lines = []
+        last_line_was_import = False
+        last_line_was_func_or_class = False
 
+        for i, line in enumerate(lines):
+            stripped_line = line.strip()
+
+            if stripped_line == "":
+                if last_line_was_import or last_line_was_func_or_class:
+                    # Avoid appending too many blank lines after imports or functions
+                    continue
+
+            if stripped_line.startswith(('def ', 'class ')):
+                if last_line_was_import or (formatted_lines and formatted_lines[-1].strip() != ""):
+                    # Ensure exactly one blank line before functions
+                    if formatted_lines and formatted_lines[-1].strip() == "":
+                        formatted_lines.pop()
+                    formatted_lines.append("")
+                last_line_was_func_or_class = True
+                last_line_was_import = False
+            elif stripped_line.startswith(('import ', 'from ')):
+                last_line_was_import = True
+                last_line_was_func_or_class = False
+            else:
+                last_line_was_func_or_class = False
+                last_line_was_import = False
+
+            formatted_lines.append(line)
+
+        # Remove any leading or trailing blank lines
+        while formatted_lines and formatted_lines[0].strip() == "":
+            formatted_lines.pop(0)
+        while formatted_lines and formatted_lines[-1].strip() == "":
+            formatted_lines.pop()
+
+        return formatted_lines
 
     def reorder_imports(self):
         stdlib_imports, third_party_imports, local_imports = [], [], []
