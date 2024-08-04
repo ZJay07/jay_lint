@@ -76,3 +76,11 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "class",
+    srcs = ["test/test_class.py"],
+    deps = [
+        ":lexing",
+    ],
+)

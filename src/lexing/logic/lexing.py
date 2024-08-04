@@ -1,8 +1,8 @@
 import ast
-import sys
 import tokenize
 from io import BytesIO
 import re
+import sys
 
 class JayLinter(ast.NodeVisitor):
     def __init__(self, source_code):
@@ -16,6 +16,9 @@ class JayLinter(ast.NodeVisitor):
         self.function_args = {}
         self.unused_imports = set()
         self.unused_variables = set()
+        self.class_attributes = {}
+        self.used_class_attributes = set()
+        self.current_class = None
 
     def _has_preceding_comment(self, func_lineno):
         for token in self.tokens:
@@ -31,6 +34,14 @@ class JayLinter(ast.NodeVisitor):
         self.function_args[node.name] = arg_names
         
         self.generic_visit(node)
+
+    def visit_ClassDef(self, node):
+        self.current_class = node.name
+        self.class_attributes[self.current_class] = set()
+        print(f"Entering class {self.current_class}")
+        self.generic_visit(node)
+        print(f"Exiting class {self.current_class}")
+        self.current_class = None
 
     def visit_Import(self, node):
         for alias in node.names:
@@ -48,6 +59,16 @@ class JayLinter(ast.NodeVisitor):
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
             self.used_names.add(node.id)
+        self.generic_visit(node)
+    
+    def visit_Attribute(self, node):
+        if isinstance(node.ctx, ast.Load):
+            self.used_class_attributes.add(node.attr)
+            print(f"Used attribute: {node.attr}")
+        elif isinstance(node.ctx, ast.Store) and isinstance(node.value, ast.Name) and node.value.id == 'self':
+            if self.current_class:
+                self.class_attributes[self.current_class].add(node.attr)
+                print(f"Assigned attribute: {node.attr} in class {self.current_class}")
         self.generic_visit(node)
 
     def check_import_order(self):
@@ -155,17 +176,61 @@ class JayLinter(ast.NodeVisitor):
         updated_lines = self.source_lines.copy()
         tree = ast.parse(self.source_code)
 
-        # Remove unused function arguments
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
-                function_line = updated_lines[node.lineno - 1]
-                unused_args = set(self.function_args.get(node.name, [])) - self.used_names
-                if unused_args:
-                    for arg in unused_args:
-                        function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
-                    function_line = re.sub(r',\s*\)', ')', function_line)  # Remove trailing commas
-                    function_line = re.sub(r'\(\s*,', '(', function_line)  # Remove leading commas
-                    updated_lines[node.lineno - 1] = function_line
+        # Detect if a class is present
+        contains_class = any(isinstance(node, ast.ClassDef) for node in ast.walk(tree))
+
+        if contains_class:
+            print("Class detected")
+            # Handle self attributes separately if a class is present
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    function_line = updated_lines[node.lineno - 1]
+                    unused_args = set(self.function_args.get(node.name, [])) - self.used_names
+                    print(f"Function '{node.name}' with args: {self.function_args.get(node.name, [])}, unused args: {unused_args}")
+                    if unused_args:
+                        for arg in unused_args:
+                            function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
+                        function_line = re.sub(r',\s*\)', ')', function_line)  # Remove trailing commas
+                        function_line = re.sub(r'\(\s*,', '(', function_line)  # Remove leading commas
+                        updated_lines[node.lineno - 1] = function_line
+
+            # Remove assignments of unused self attributes
+            for class_name, attrs in self.class_attributes.items():
+                print("Class attributes:", self.class_attributes)
+                unused_attrs = attrs - self.used_class_attributes
+                print(f"Class '{class_name}' with assigned attributes: {attrs}, used attributes: {self.used_class_attributes}")
+                print(f"Class '{class_name}' with unused attributes: {unused_attrs}")
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Assign):
+                        for target in node.targets:
+                            if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self' and target.attr in unused_attrs:
+                                print(f"Removing line {node.lineno}: {updated_lines[node.lineno - 1]}")
+                                updated_lines[node.lineno - 1] = ''
+
+            # Remove extra blank lines around removed lines
+            updated_lines = self.remove_extra_blank_lines(updated_lines)
+
+        else:
+            # Normal procedure for removing unused function arguments and variables
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    function_line = updated_lines[node.lineno - 1]
+                    unused_args = set(self.function_args.get(node.name, [])) - self.used_names
+                    print(f"Function '{node.name}' with args: {self.function_args.get(node.name, [])}, unused args: {unused_args}")
+                    if unused_args:
+                        for arg in unused_args:
+                            function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
+                        function_line = re.sub(r',\s*\)', ')', function_line)  # Remove trailing commas
+                        function_line = re.sub(r'\(\s*,', '(', function_line)  # Remove leading commas
+                        updated_lines[node.lineno - 1] = function_line
+
+                # Remove assignments of unused variables
+                if isinstance(node, ast.Assign):
+                    assigned_vars = {target.id for target in node.targets if isinstance(target, ast.Name)}
+                    print(f"Assigned vars: {assigned_vars}, unused vars: {self.unused_variables}")
+                    if assigned_vars.issubset(self.unused_variables):
+                        print(f"Removing line {node.lineno}: {updated_lines[node.lineno - 1]}")
+                        updated_lines[node.lineno - 1] = ''
 
         # Remove lines with unused imports
         for i, line in enumerate(updated_lines):
@@ -180,15 +245,10 @@ class JayLinter(ast.NodeVisitor):
                 else:
                     continue  # Skip lines that don't match expected format
                 
+                print(f"Import '{import_name}', unused imports: {self.unused_imports}")
                 if import_name in self.unused_imports:
+                    print(f"Removing import line {i + 1}: {line}")
                     updated_lines[i] = ''  # Remove the entire line
-
-        # Remove assignments of unused variables
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign):
-                assigned_vars = {target.id for target in node.targets if isinstance(target, ast.Name)}
-                if assigned_vars.issubset(self.unused_variables):
-                    updated_lines[node.lineno - 1] = ''
 
         # Apply formatting for blank lines
         formatted_lines = self.ensure_blank_lines_between_functions(updated_lines)
@@ -196,9 +256,29 @@ class JayLinter(ast.NodeVisitor):
         self.source_lines = formatted_lines
         self.source_code = "\n".join(self.source_lines).strip()
         self.reorder_imports()
-
+        
+        # Ensure the final source_code is correctly printed
+        print("Final source code:")
+        print(self.source_code)
+        
         return self.source_code
     
+    def remove_extra_blank_lines(self, lines):
+        """
+        Removes extra blank lines around removed lines to maintain formatting consistency.
+        """
+        result = []
+        skip_next = False
+        for i, line in enumerate(lines):
+            if line.strip() == "":
+                if skip_next or i == 0 or i == len(lines) - 1 or (i + 1 < len(lines) and lines[i + 1].strip() == ""):
+                    continue
+                skip_next = True
+            else:
+                skip_next = False
+            result.append(line)
+        return result
+
     def ensure_blank_lines_between_functions(self, lines):
         """
         Ensures there is exactly one blank line between top-level function and class definitions,
@@ -295,4 +375,19 @@ class JayLinter(ast.NodeVisitor):
     
     def fix(self):
         self.lint()  # Ensure all checks are run and data is populated
-        self.remove_unused_code()
+        self.source_code = self.remove_unused_code()  # Fix the code and update source_code
+
+# Example usage
+source_code = """
+class MyClass:
+    def __init__(self):
+        self.used_attr = 10
+        self.unused_attr = 20
+    
+    def method(self):
+        return self.used_attr
+"""
+
+linter = JayLinter(source_code)
+fixed_code = linter.fix()
+print("Fixed code:\n", fixed_code)
