@@ -19,15 +19,14 @@ jobs:
     - name: Install Please (plz)
       run: |
         curl -s https://get.please.build | bash
-        echo 'export PATH=$PATH:$HOME/.please' >> $GITHUB_ENV
+        echo 'export PATH=$HOME/.please:$PATH' >> $GITHUB_ENV
 
     - name: Build
       run: plz build //src/...
       env:
-        PATH: ${{ env.PATH }}
+        PATH: ${{ env.PATH }}:$HOME/.please
 
     - name: Test
       run: plz test //src/...
       env:
-        PATH: ${{ env.PATH }}
-
+        PATH: ${{ env.PATH }}:$HOME/.please
