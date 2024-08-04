@@ -84,3 +84,11 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "force_fail",
+    srcs = ["test/test_force_fail.py"],
+    deps = [
+        ":lexing",
+    ],
+)
