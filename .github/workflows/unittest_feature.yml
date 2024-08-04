@@ -16,13 +16,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Set up Please (plz)
+    - name: Install Please (plz)
       run: |
         curl -s https://get.please.build | bash
-        export PATH=$PATH:/usr/local/bin
+        echo 'export PATH=$PATH:$HOME/.please' >> $GITHUB_ENV
 
     - name: Build
       run: plz build //src/...
+      env:
+        PATH: ${{ env.PATH }}
 
     - name: Test
       run: plz test //src/...
+      env:
+        PATH: ${{ env.PATH }}
+
