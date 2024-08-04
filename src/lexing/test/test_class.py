@@ -4,8 +4,8 @@ from src.lexing.logic.lexing import JayLinter
 class TestJayLinterRemoveUnusedSelfAttributes(unittest.TestCase):
     def fix_and_remove_unused_self(self, code):
         linter = JayLinter(source_code=code)
-        fixed_code = linter.remove_unused_code()
-        return fixed_code.strip()
+        linter.fix()
+        return linter.source_code.strip()
 
     def test_remove_unused_self_attribute(self):
         code = """
@@ -19,6 +19,7 @@ class MyClass:
 """
         expected_fixed_code = """
 class MyClass:
+
     def __init__(self):
         self.used_attr = 10
 
@@ -48,7 +49,6 @@ class MyClass:
         self.used_attr = 10
         # This is a comment
 
-
     def method(self):
         return self.used_attr
 """
@@ -60,6 +60,7 @@ class MyClass:
     def test_no_removal_for_used_self_attribute(self):
         code = """
 class MyClass:
+
     def __init__(self):
         self.used_attr = 10
 
