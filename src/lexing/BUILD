@@ -84,3 +84,11 @@ python_test(
         ":lexing",
     ],
 )
+
+python_test(
+    name = "return",
+    srcs = ["test/test_return.py"],
+    deps = [
+        ":lexing",
+    ],
+)

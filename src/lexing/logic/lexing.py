@@ -38,9 +38,7 @@ class JayLinter(ast.NodeVisitor):
     def visit_ClassDef(self, node):
         self.current_class = node.name
         self.class_attributes[self.current_class] = set()
-        print(f"Entering class {self.current_class}")
         self.generic_visit(node)
-        print(f"Exiting class {self.current_class}")
         self.current_class = None
 
     def visit_Import(self, node):
@@ -64,11 +62,16 @@ class JayLinter(ast.NodeVisitor):
     def visit_Attribute(self, node):
         if isinstance(node.ctx, ast.Load):
             self.used_class_attributes.add(node.attr)
-            print(f"Used attribute: {node.attr}")
         elif isinstance(node.ctx, ast.Store) and isinstance(node.value, ast.Name) and node.value.id == 'self':
             if self.current_class:
                 self.class_attributes[self.current_class].add(node.attr)
-                print(f"Assigned attribute: {node.attr} in class {self.current_class}")
+        self.generic_visit(node)
+
+    def visit_Return(self, node):
+        # Check for blank lines before return statements
+        return_lineno = node.lineno
+        if return_lineno > 1 and self.source_lines[return_lineno - 2].strip() == "":
+            self.messages.append(f"Line {return_lineno} has a blank line before 'return' statement.")
         self.generic_visit(node)
 
     def check_import_order(self):
@@ -171,6 +174,19 @@ class JayLinter(ast.NodeVisitor):
         for i, line in enumerate(self.source_lines, start=1):
             if len(line) > max_length:
                 self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
+    
+    def remove_blank_lines_before_return(self, lines):
+        """
+        Remove any blank lines immediately before return statements.
+        """
+        result = []
+        for i, line in enumerate(lines):
+            stripped_line = line.strip()
+            if stripped_line.startswith('return'):
+                if i > 0 and lines[i - 1].strip() == '':
+                    result.pop()
+            result.append(line)
+        return result
 
     def remove_unused_code(self):
         updated_lines = self.source_lines.copy()
@@ -180,13 +196,11 @@ class JayLinter(ast.NodeVisitor):
         contains_class = any(isinstance(node, ast.ClassDef) for node in ast.walk(tree))
 
         if contains_class:
-            print("Class detected")
             # Handle self attributes separately if a class is present
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     function_line = updated_lines[node.lineno - 1]
                     unused_args = set(self.function_args.get(node.name, [])) - self.used_names
-                    print(f"Function '{node.name}' with args: {self.function_args.get(node.name, [])}, unused args: {unused_args}")
                     if unused_args:
                         for arg in unused_args:
                             function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
@@ -196,15 +210,11 @@ class JayLinter(ast.NodeVisitor):
 
             # Remove assignments of unused self attributes
             for class_name, attrs in self.class_attributes.items():
-                print("Class attributes:", self.class_attributes)
                 unused_attrs = attrs - self.used_class_attributes
-                print(f"Class '{class_name}' with assigned attributes: {attrs}, used attributes: {self.used_class_attributes}")
-                print(f"Class '{class_name}' with unused attributes: {unused_attrs}")
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Assign):
                         for target in node.targets:
                             if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self' and target.attr in unused_attrs:
-                                print(f"Removing line {node.lineno}: {updated_lines[node.lineno - 1]}")
                                 updated_lines[node.lineno - 1] = ''
 
             # Remove extra blank lines around removed lines
@@ -216,7 +226,6 @@ class JayLinter(ast.NodeVisitor):
                 if isinstance(node, ast.FunctionDef):
                     function_line = updated_lines[node.lineno - 1]
                     unused_args = set(self.function_args.get(node.name, [])) - self.used_names
-                    print(f"Function '{node.name}' with args: {self.function_args.get(node.name, [])}, unused args: {unused_args}")
                     if unused_args:
                         for arg in unused_args:
                             function_line = re.sub(r'\b' + re.escape(arg) + r'\b\s*,?\s*', '', function_line)
@@ -227,9 +236,7 @@ class JayLinter(ast.NodeVisitor):
                 # Remove assignments of unused variables
                 if isinstance(node, ast.Assign):
                     assigned_vars = {target.id for target in node.targets if isinstance(target, ast.Name)}
-                    print(f"Assigned vars: {assigned_vars}, unused vars: {self.unused_variables}")
                     if assigned_vars.issubset(self.unused_variables):
-                        print(f"Removing line {node.lineno}: {updated_lines[node.lineno - 1]}")
                         updated_lines[node.lineno - 1] = ''
 
         # Remove lines with unused imports
@@ -245,28 +252,22 @@ class JayLinter(ast.NodeVisitor):
                 else:
                     continue  # Skip lines that don't match expected format
                 
-                print(f"Import '{import_name}', unused imports: {self.unused_imports}")
                 if import_name in self.unused_imports:
-                    print(f"Removing import line {i + 1}: {line}")
                     updated_lines[i] = ''  # Remove the entire line
 
         # Apply formatting for blank lines
         formatted_lines = self.ensure_blank_lines_between_functions(updated_lines)
 
+        # Remove blank lines before return statements
+        formatted_lines = self.remove_blank_lines_before_return(formatted_lines)
+
         self.source_lines = formatted_lines
         self.source_code = "\n".join(self.source_lines).strip()
         self.reorder_imports()
         
-        # Ensure the final source_code is correctly printed
-        print("Final source code:")
-        print(self.source_code)
-        
         return self.source_code
     
     def remove_extra_blank_lines(self, lines):
-        """
-        Removes extra blank lines around removed lines to maintain formatting consistency.
-        """
         result = []
         skip_next = False
         for i, line in enumerate(lines):
@@ -280,10 +281,6 @@ class JayLinter(ast.NodeVisitor):
         return result
 
     def ensure_blank_lines_between_functions(self, lines):
-        """
-        Ensures there is exactly one blank line between top-level function and class definitions,
-        and two blank lines after imports (if any) before the first function or class.
-        """
         formatted_lines = []
         last_line_was_import = False
         last_line_was_func_or_class = False
@@ -377,17 +374,3 @@ class JayLinter(ast.NodeVisitor):
         self.lint()  # Ensure all checks are run and data is populated
         self.source_code = self.remove_unused_code()  # Fix the code and update source_code
 
-# Example usage
-source_code = """
-class MyClass:
-    def __init__(self):
-        self.used_attr = 10
-        self.unused_attr = 20
-    
-    def method(self):
-        return self.used_attr
-"""
-
-linter = JayLinter(source_code)
-fixed_code = linter.fix()
-print("Fixed code:\n", fixed_code)
