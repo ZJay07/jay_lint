@@ -174,6 +174,19 @@ class JayLinter(ast.NodeVisitor):
         for i, line in enumerate(self.source_lines, start=1):
             if len(line) > max_length:
                 self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
+    
+    def remove_blank_lines_before_return(self, lines):
+        """
+        Remove any blank lines immediately before return statements.
+        """
+        result = []
+        for i, line in enumerate(lines):
+            stripped_line = line.strip()
+            if stripped_line.startswith('return'):
+                if i > 0 and lines[i - 1].strip() == '':
+                    result.pop()
+            result.append(line)
+        return result
 
     def remove_unused_code(self):
         updated_lines = self.source_lines.copy()
@@ -244,6 +257,9 @@ class JayLinter(ast.NodeVisitor):
 
         # Apply formatting for blank lines
         formatted_lines = self.ensure_blank_lines_between_functions(updated_lines)
+
+        # Remove blank lines before return statements
+        formatted_lines = self.remove_blank_lines_before_return(formatted_lines)
 
         self.source_lines = formatted_lines
         self.source_code = "\n".join(self.source_lines).strip()
@@ -358,17 +374,3 @@ class JayLinter(ast.NodeVisitor):
         self.lint()  # Ensure all checks are run and data is populated
         self.source_code = self.remove_unused_code()  # Fix the code and update source_code
 
-# Example usage
-source_code = """
-class MyClass:
-    def __init__(self):
-        self.used_attr = 10
-        self.unused_attr = 20
-    
-    def method(self):
-        return self.used_attr
-"""
-
-linter = JayLinter(source_code)
-fixed_code = linter.fix()
-print("Fixed code:\n", fixed_code)

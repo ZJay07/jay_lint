@@ -53,6 +53,23 @@ def function_without_blank_line():
         """
         fixed_code = self.fix_code(code)
         self.assertEqual(fixed_code.strip(), expected_fixed_code.strip())
+    
+    def test_fix_return_with_blank_line_before_variables(self):
+        code = """
+def function_with_blank_line():
+    a = 1
+
+    return a
+        """
+        expected_fixed_code = """
+def function_with_blank_line():
+    a = 1
+    return a
+        """
+        fixed_code = self.fix_code(code)
+        print(f"fixed_code: {fixed_code}")
+        print(f"expected_fixed_code: {expected_fixed_code}")
+        self.assertEqual(fixed_code.strip(), expected_fixed_code.strip())
 
 if __name__ == '__main__':
     unittest.main()

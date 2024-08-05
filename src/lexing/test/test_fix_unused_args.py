@@ -32,7 +32,6 @@ def my_function():
         expected_fixed_code = """
 def my_function():
     x = 42
-
     return x
 """
         fixed_code = self.fix_code(code)
