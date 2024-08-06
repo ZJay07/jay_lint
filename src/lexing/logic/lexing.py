@@ -112,10 +112,6 @@ class JayLinter(ast.NodeVisitor):
                         lineno = node.lineno
                         self.messages.append(f"Variable '{target.id}' assigned on line {lineno} is not used.")
                         self.unused_variables_lines.append(lineno-1)
-                        print(f"Unused variable '{target.id}' assigned on line {lineno}")
-
-        print(f"Unused variable lines: {self.unused_variables_lines}")
-
 
     def check_empty_lines(self):
         previous_line_empty = False
@@ -289,7 +285,6 @@ class JayLinter(ast.NodeVisitor):
         unused_variable_lines_set = set(self.unused_variables_lines)  # Ensure it's a set for quick look-up
 
         for i, line in enumerate(lines):
-            print(f"line{i}: {line}")
             if line.strip() == "":
                 if skip_next or i == 0 or i == len(lines) - 1 or (i + 1 < len(lines) and lines[i + 1].strip() == ""):
                     continue
