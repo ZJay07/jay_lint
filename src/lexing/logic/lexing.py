@@ -18,6 +18,7 @@ class JayLinter(ast.NodeVisitor):
         self.unused_variables = set()
         self.class_attributes = {}
         self.used_class_attributes = set()
+        self.unused_variables_lines = []
         self.current_class = None
 
     def _has_preceding_comment(self, func_lineno):
@@ -99,11 +100,22 @@ class JayLinter(ast.NodeVisitor):
                 self.messages.append(f"Function '{func_name}' has an unused argument '{arg}'.")
 
     def check_unused_variables(self):
-        assigned_names = {node.id for node in ast.walk(ast.parse(self.source_code)) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)}
+        tree = ast.parse(self.source_code)
+        assigned_names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)}
         self.unused_variables = assigned_names - self.used_names
-        for var in self.unused_variables:
-            lineno = next(node.lineno for node in ast.walk(ast.parse(self.source_code)) if isinstance(node, ast.Name) and node.id == var)
-            self.messages.append(f"Variable '{var}' assigned on line {lineno} is not used.")
+        self.unused_variables_lines = []  # Ensure it's a list
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in self.unused_variables:
+                        lineno = node.lineno
+                        self.messages.append(f"Variable '{target.id}' assigned on line {lineno} is not used.")
+                        self.unused_variables_lines.append(lineno-1)
+                        print(f"Unused variable '{target.id}' assigned on line {lineno}")
+
+        print(f"Unused variable lines: {self.unused_variables_lines}")
+
 
     def check_empty_lines(self):
         previous_line_empty = False
@@ -174,19 +186,6 @@ class JayLinter(ast.NodeVisitor):
         for i, line in enumerate(self.source_lines, start=1):
             if len(line) > max_length:
                 self.messages.append(f"Line {i} exceeds the maximum line length of {max_length} characters.")
-    
-    def remove_blank_lines_before_return(self, lines):
-        """
-        Remove any blank lines immediately before return statements.
-        """
-        result = []
-        for i, line in enumerate(lines):
-            stripped_line = line.strip()
-            if stripped_line.startswith('return'):
-                if i > 0 and lines[i - 1].strip() == '':
-                    result.pop()
-            result.append(line)
-        return result
 
     def remove_unused_code(self):
         updated_lines = self.source_lines.copy()
@@ -238,6 +237,21 @@ class JayLinter(ast.NodeVisitor):
                     assigned_vars = {target.id for target in node.targets if isinstance(target, ast.Name)}
                     if assigned_vars.issubset(self.unused_variables):
                         updated_lines[node.lineno - 1] = ''
+                        # Remove blank line if it exists after removing unused variable
+                        if node.lineno < len(updated_lines) - 1 and updated_lines[node.lineno].strip() == '':
+                            del updated_lines[node.lineno]
+                        # Ensure the next line isn't left blank
+                        elif node.lineno < len(updated_lines) - 1 and updated_lines[node.lineno] == '':
+                            del updated_lines[node.lineno]
+
+            # Remove usages of unused variables in return statements
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Return):
+                    new_return_line = updated_lines[node.lineno - 1]
+                    for var in self.unused_variables:
+                        new_return_line = re.sub(r'\b' + re.escape(var) + r'\b\s*\+\s*', '', new_return_line)
+                        new_return_line = re.sub(r'\s*\+\s*' + re.escape(var) + r'\b', '', new_return_line)
+                    updated_lines[node.lineno - 1] = new_return_line
 
         # Remove lines with unused imports
         for i, line in enumerate(updated_lines):
@@ -261,16 +275,21 @@ class JayLinter(ast.NodeVisitor):
         # Remove blank lines before return statements
         formatted_lines = self.remove_blank_lines_before_return(formatted_lines)
 
+        formatted_lines = self.remove_extra_blank_lines(formatted_lines)
+
         self.source_lines = formatted_lines
         self.source_code = "\n".join(self.source_lines).strip()
         self.reorder_imports()
         
         return self.source_code
-    
+
     def remove_extra_blank_lines(self, lines):
         result = []
         skip_next = False
+        unused_variable_lines_set = set(self.unused_variables_lines)  # Ensure it's a set for quick look-up
+
         for i, line in enumerate(lines):
+            print(f"line{i}: {line}")
             if line.strip() == "":
                 if skip_next or i == 0 or i == len(lines) - 1 or (i + 1 < len(lines) and lines[i + 1].strip() == ""):
                     continue
@@ -278,6 +297,18 @@ class JayLinter(ast.NodeVisitor):
             else:
                 skip_next = False
             result.append(line)
+            
+            # Remove any blank lines after the line with the unused variable
+            if i + 1 in unused_variable_lines_set:
+                while result and result[-1].strip() == "":
+                    result.pop()
+
+        # Remove leading and trailing blank lines
+        while result and result[0].strip() == "":
+            result.pop(0)
+        while result and result[-1].strip() == "":
+            result.pop()
+
         return result
 
     def ensure_blank_lines_between_functions(self, lines):
@@ -373,4 +404,17 @@ class JayLinter(ast.NodeVisitor):
     def fix(self):
         self.lint()  # Ensure all checks are run and data is populated
         self.source_code = self.remove_unused_code()  # Fix the code and update source_code
+
+    def remove_blank_lines_before_return(self, lines):
+        """
+        Remove any blank lines immediately before return statements.
+        """
+        result = []
+        for i, line in enumerate(lines):
+            stripped_line = line.strip()
+            if stripped_line.startswith('return'):
+                if i > 0 and lines[i - 1].strip() == '':
+                    result.pop()
+            result.append(line)
+        return result
 

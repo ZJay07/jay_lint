@@ -7,4 +7,5 @@ def hello(arg1):
 def hello_2(arg1):
     a = arg1
 
-    return a
+    c = 2
+    return a + c
