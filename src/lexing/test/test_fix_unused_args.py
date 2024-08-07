@@ -87,5 +87,47 @@ def my_function():
         print(f"expected_fixed_code: {expected_fixed_code}")
         self.assertEqual(fixed_code.strip(), expected_fixed_code.strip())
 
+    def test_fix_removes_unused_variables_multiple_variables_middle(self):
+        code = """
+def my_function():
+    x = 42
+    a = "unused"
+    b = "used"
+    y = "unused"
+    z = "used"
+    return x + z + b
+"""
+        expected_fixed_code = """
+def my_function():
+    x = 42
+    b = "used"
+    z = "used"
+    return x + z + b
+"""
+        fixed_code = self.fix_code(code)
+        print(f"fixed_code: {fixed_code}")
+        print(f"expected_fixed_code: {expected_fixed_code}")
+        self.assertEqual(fixed_code.strip(), expected_fixed_code.strip())
+
+    def test_fix_removes_unused_variables_multiple_variables_start_middle(self):
+        code = """
+def my_function():
+    a = "unused"
+    b = "used"
+    y = "unused"
+    z = "used"
+    return z + b
+"""
+        expected_fixed_code = """
+def my_function():
+    b = "used"
+    z = "used"
+    return z + b
+"""
+        fixed_code = self.fix_code(code)
+        print(f"fixed_code: {fixed_code}")
+        print(f"expected_fixed_code: {expected_fixed_code}")
+        self.assertEqual(fixed_code.strip(), expected_fixed_code.strip())
+
 if __name__ == '__main__':
     unittest.main()

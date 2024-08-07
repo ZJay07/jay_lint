@@ -282,11 +282,13 @@ class JayLinter(ast.NodeVisitor):
     def remove_extra_blank_lines(self, lines):
         result = []
         skip_next = False
-        unused_variable_lines_set = set(self.unused_variables_lines)  # Ensure it's a set for quick look-up
+        unused_variable_lines_set = set(self.unused_variables_lines)
 
         for i, line in enumerate(lines):
             if line.strip() == "":
                 if skip_next or i == 0 or i == len(lines) - 1 or (i + 1 < len(lines) and lines[i + 1].strip() == ""):
+                    continue
+                if i in unused_variable_lines_set:
                     continue
                 skip_next = True
             else:
@@ -412,4 +414,3 @@ class JayLinter(ast.NodeVisitor):
                     result.pop()
             result.append(line)
         return result
-
