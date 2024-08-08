@@ -4,6 +4,11 @@
 
 This is my attempt in making my own linter using [Please](https://github.com/thought-machine/please) from Thought Machine and the python [ast](https://docs.python.org/3/library/ast.html) library
 
+# Install it via pip
+```bash
+pip install jay_lint
+```
+
 # To install, on the root directory run:
 ```bash
 pip install .

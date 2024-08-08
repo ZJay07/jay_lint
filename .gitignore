@@ -5,3 +5,4 @@ plz-out
 /__pycache__/
 jays_linter.egg-info/
 build/
+dist/
