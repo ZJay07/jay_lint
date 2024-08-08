@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "jay_lint"
+version = "0.0.2"
+description = "Jay Choy's personal linter"
+authors = ["Jay Choy <choyzhengjay@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "src/cli.py" },
+    ]
+
+[tool.poetry.dependencies]
+python = ">=3.7,<4.0"
+
+[tool.poetry.scripts]
+jay_lint = "cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
