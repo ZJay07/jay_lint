@@ -92,3 +92,20 @@ python_test(
         ":lexing",
     ],
 )
+
+python_library(
+    name = "ts_linter",
+    srcs = ["logic/ts_linter.py"],
+    visibility = ["//src/..."],
+    deps = ["//third_party/python:tree_sitter", "//third_party/python:tree_sitter_typescript"],
+)
+
+python_test(
+    name = "ts_tests",
+    srcs = glob(["test/test_ts_*.py"]),
+    deps = [
+        ":ts_linter",
+        ":lexing",
+        "//src:cli",
+    ],
+)

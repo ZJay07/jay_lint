@@ -4,6 +4,10 @@ setup(
     name='jays-linter',
     version='1.0.0',
     packages=find_packages(),
+    extras_require={
+        # TypeScript / JavaScript support: pip install 'jays-linter[ts]'
+        'ts': ['tree-sitter>=0.23', 'tree-sitter-typescript>=0.23'],
+    },
     entry_points={
         'console_scripts': [
             'jays-linter = src.cli:main',

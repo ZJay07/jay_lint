@@ -7,5 +7,6 @@ python_binary(
 python_library (
     name = "cli",
     srcs = ["cli.py"],
-    visibility= ["//Jay_lint/..."],
+    visibility= ["//Jay_lint/...", "//src/..."],
+    deps = ["//src/lexing", "//src/lexing:ts_linter"],
 )
