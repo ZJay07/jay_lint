@@ -27,3 +27,11 @@ eg:
 ```bash
 jays-linter --fix <test.py>
 ```
+
+# Development (Please)
+Tests run under Please, pinned to the Python in `.python-version` (currently 3.11) so local and CI match.
+Please builds with its own restricted `PATH`, so it ignores the `python3` on yours; `scripts/use_uv_python.sh` installs the pinned Python with [uv](https://docs.astral.sh/uv/) and points Please at it (via an untracked `.plzconfig.local`).
+```bash
+./scripts/use_uv_python.sh
+./pleasew test //src/...
+```
