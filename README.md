@@ -54,3 +54,11 @@ Checks (`--fix` can fix the ones marked *fix*):
 The import order rules mirror `eslint-plugin-import`'s `import/order` with
 `alphabetize` and `newlines-between: always`, so the two agree. Imports are only reordered
 when nothing but imports sits between them; a comment between two imports leaves them alone.
+
+# Development (Please)
+Tests run under Please, pinned to the Python in `.python-version` (currently 3.11) so local and CI match.
+Please builds with its own restricted `PATH`, so it ignores the `python3` on yours; `scripts/use_uv_python.sh` installs the pinned Python with [uv](https://docs.astral.sh/uv/) and points Please at it (via an untracked `.plzconfig.local`).
+```bash
+./scripts/use_uv_python.sh
+./pleasew test //src/...
+```
