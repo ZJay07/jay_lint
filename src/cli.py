@@ -41,12 +41,12 @@ def lint_python(file_path, fix):
     return messages
 
 def lint_typescript(file_path, fix, max_line_length):
-    # Imported here so the Python linter works without the optional tree-sitter packages.
+    # tree-sitter needs Python 3.9+, so on older Pythons only the Python linter is available.
     try:
         from src.lexing.logic.ts_linter import TsLinter
     except ImportError:
-        print(f"Error: linting '{file_path}' needs the TypeScript extras: "
-              "pip install 'jay_lint[ts]'")
+        print(f"Error: linting '{file_path}' needs Python 3.9 or newer with the "
+              "tree-sitter packages: pip install --upgrade jay_lint")
         return ['TypeScript support is not installed']
 
     # newline='' keeps CRLF files CRLF.

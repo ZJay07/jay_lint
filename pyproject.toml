@@ -16,12 +16,9 @@ exclude = [
 
 [tool.poetry.dependencies]
 python = ">=3.7,<4.0"
-# TypeScript / JavaScript support is optional: pip install "jay_lint[ts]"
-tree-sitter = { version = ">=0.23", optional = true, python = ">=3.9" }
-tree-sitter-typescript = { version = ">=0.23", optional = true, python = ">=3.9" }
-
-[tool.poetry.extras]
-ts = ["tree-sitter", "tree-sitter-typescript"]
+# TypeScript / JavaScript linting uses tree-sitter, which needs Python 3.9+.
+tree-sitter = { version = ">=0.23", python = ">=3.9" }
+tree-sitter-typescript = { version = ">=0.23", python = ">=3.9" }
 
 [tool.poetry.scripts]
 jay_lint = "src.cli:main"

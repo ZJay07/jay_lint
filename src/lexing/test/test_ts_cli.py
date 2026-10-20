@@ -113,10 +113,12 @@ class TestTsCli(unittest.TestCase):
 
     def test_missing_tree_sitter_gives_an_install_hint(self):
         path = self.write('a.ts', "export const a = 1;\n")
-        # A None entry in sys.modules makes the import fail, like an install without [ts].
+        # A None entry in sys.modules makes the import fail, like Python 3.7/3.8 where
+        # the tree-sitter packages are not installed.
         with mock.patch.dict(sys.modules, {'src.lexing.logic.ts_linter': None}):
             code, out = run_cli('--strict', path)
-        self.assertIn("pip install 'jay_lint[ts]'", out)
+        self.assertIn("needs Python 3.9 or newer", out)
+        self.assertIn("pip install --upgrade jay_lint", out)
         self.assertEqual(code, 1)
 
     def test_python_files_still_use_the_python_linter(self):
