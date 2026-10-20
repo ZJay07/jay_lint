@@ -105,6 +105,12 @@ class TestTsCli(unittest.TestCase):
         path = self.write('a.txt', "hello\n")
         self.assertIn("not a supported file", run_cli(path)[1])
 
+    def test_help_uses_the_jlint_command_name(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            main(['--help'])
+        self.assertIn("usage: jlint", out.getvalue())
+
     def test_missing_tree_sitter_gives_an_install_hint(self):
         path = self.write('a.ts', "export const a = 1;\n")
         # A None entry in sys.modules makes the import fail, like an install without [ts].

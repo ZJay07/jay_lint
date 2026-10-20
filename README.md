@@ -15,31 +15,31 @@ pip install .
 ```
 
 # How to use?
-After installing, simply run `jays-linter` followed by your file name.
+After installing, simply run `jlint` followed by your file name.
 eg:
 ```bash
-jays-linter <test.py>
+jlint <test.py>
 ```
 
 # How to use 'fix'?
 Same as before, just add `--fix` after the file name
 eg:
 ```bash
-jays-linter --fix <test.py>
+jlint --fix <test.py>
 ```
 
 # TypeScript / JavaScript support
-`jays-linter` also lints `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` files. It parses them with
+`jlint` also lints `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` files. It parses them with
 [tree-sitter](https://tree-sitter.github.io/), which is an optional install:
 ```bash
 pip install "jay_lint[ts]"
 ```
 
 ```bash
-jays-linter app/page.tsx                      # one file
-jays-linter app components lib                # directories (node_modules, .next, plz-out skipped)
-jays-linter --fix components/Bio.tsx          # fix in place
-jays-linter --strict --max-line-length 88 app # exit 1 if anything is reported (for CI)
+jlint app/page.tsx                      # one file
+jlint app components lib                # directories (node_modules, .next, plz-out skipped)
+jlint --fix components/Bio.tsx          # fix in place
+jlint --strict --max-line-length 88 app # exit 1 if anything is reported (for CI)
 ```
 
 Checks (`--fix` can fix the ones marked *fix*):

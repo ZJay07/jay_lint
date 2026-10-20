@@ -88,7 +88,7 @@ def collect_files(paths):
     return files
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Python and TypeScript linter')
+    parser = argparse.ArgumentParser(prog='jlint', description='Python and TypeScript linter')
     parser.add_argument('files', nargs='+', type=str, help='Files or directories to lint')
     parser.add_argument('--fix', action='store_true', help="Automatically fix the code")
     parser.add_argument('--max-line-length', type=int, default=100,
