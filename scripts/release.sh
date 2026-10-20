@@ -10,11 +10,16 @@
 # token. You can also set TWINE_USERNAME and TWINE_PASSWORD. The token is never stored
 # by this script.
 #
-# Uses `python` from your PATH; set PYTHON=/path/to/python to use another one.
+# Uses `python3` (or `python`) from your PATH; set PYTHON=/path/to/python to use another.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PYTHON="${PYTHON:-python}"
+if [ -z "${PYTHON:-}" ]; then
+  if command -v python3 > /dev/null 2>&1; then PYTHON=python3
+  elif command -v python > /dev/null 2>&1; then PYTHON=python
+  else echo "Error: no python3 or python on PATH (or set PYTHON=...)" >&2; exit 1
+  fi
+fi
 dry_run=0
 assume_yes=0
 repository=()
@@ -35,7 +40,8 @@ fail() {
   exit 1
 }
 
-version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -n 1)"
+# tr drops the \r that a Windows checkout (core.autocrlf=true) puts in the file.
+version="$(tr -d '\r' < pyproject.toml | sed -n 's/^version *= *"\([^"]*\)".*$/\1/p' | head -n 1)"
 [ -n "$version" ] || fail "could not read the version from pyproject.toml"
 tag="v$version"
 echo "Releasing jay_lint $version to $target"
