@@ -5,7 +5,7 @@ setup(
     version='1.0.0',
     packages=find_packages(),
     extras_require={
-        # TypeScript / JavaScript support: pip install 'jays-linter[ts]'
+        # TypeScript / JavaScript support: pip install 'jay_lint[ts]'
         'ts': ['tree-sitter>=0.23', 'tree-sitter-typescript>=0.23'],
     },
     entry_points={

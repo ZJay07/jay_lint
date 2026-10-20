@@ -32,7 +32,7 @@ jays-linter --fix <test.py>
 `jays-linter` also lints `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` files. It parses them with
 [tree-sitter](https://tree-sitter.github.io/), which is an optional install:
 ```bash
-pip install "jays-linter[ts]"
+pip install "jay_lint[ts]"
 ```
 
 ```bash

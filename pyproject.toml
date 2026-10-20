@@ -1,17 +1,22 @@
 [tool.poetry]
 name = "jay_lint"
-version = "0.0.2"
+version = "0.1.0"
 description = "Jay Choy's personal linter"
 authors = ["Jay Choy <choyzhengjay@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [
-    { include = "src/cli.py" },
+    { include = "src" },
+    ]
+exclude = [
+    "src/lexing/test",
+    "**/BUILD",
+    "**/__pycache__",
     ]
 
 [tool.poetry.dependencies]
 python = ">=3.7,<4.0"
-# TypeScript / JavaScript support is optional: pip install "jays-linter[ts]"
+# TypeScript / JavaScript support is optional: pip install "jay_lint[ts]"
 tree-sitter = { version = ">=0.23", optional = true, python = ">=3.9" }
 tree-sitter-typescript = { version = ">=0.23", optional = true, python = ">=3.9" }
 
@@ -19,7 +24,8 @@ tree-sitter-typescript = { version = ">=0.23", optional = true, python = ">=3.9"
 ts = ["tree-sitter", "tree-sitter-typescript"]
 
 [tool.poetry.scripts]
-jay_lint = "cli:main"
+jay_lint = "src.cli:main"
+jays-linter = "src.cli:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

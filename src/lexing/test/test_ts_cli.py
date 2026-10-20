@@ -1,8 +1,10 @@
 import contextlib
 import io
 import os
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from src.cli import main
 
@@ -102,6 +104,14 @@ class TestTsCli(unittest.TestCase):
     def test_unsupported_extension_is_an_error(self):
         path = self.write('a.txt', "hello\n")
         self.assertIn("not a supported file", run_cli(path)[1])
+
+    def test_missing_tree_sitter_gives_an_install_hint(self):
+        path = self.write('a.ts', "export const a = 1;\n")
+        # A None entry in sys.modules makes the import fail, like an install without [ts].
+        with mock.patch.dict(sys.modules, {'src.lexing.logic.ts_linter': None}):
+            code, out = run_cli('--strict', path)
+        self.assertIn("pip install 'jay_lint[ts]'", out)
+        self.assertEqual(code, 1)
 
     def test_python_files_still_use_the_python_linter(self):
         path = self.write('a.py', "import os\n")

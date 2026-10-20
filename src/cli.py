@@ -42,7 +42,12 @@ def lint_python(file_path, fix):
 
 def lint_typescript(file_path, fix, max_line_length):
     # Imported here so the Python linter works without the optional tree-sitter packages.
-    from src.lexing.logic.ts_linter import TsLinter
+    try:
+        from src.lexing.logic.ts_linter import TsLinter
+    except ImportError:
+        print(f"Error: linting '{file_path}' needs the TypeScript extras: "
+              "pip install 'jay_lint[ts]'")
+        return ['TypeScript support is not installed']
 
     # newline='' keeps CRLF files CRLF.
     with open(file_path, 'r', encoding='utf-8', newline='') as f:
