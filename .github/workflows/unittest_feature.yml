@@ -16,18 +16,16 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
       with:
-        python-version: '3.11'
+        version: "0.9.0"
 
-    - name: Install Please (plz)
-      run: |
-        curl -s https://get.please.build | bash
-        echo "$HOME/.please" >> $GITHUB_PATH
+    - name: Use the pinned Python (.python-version) for Please
+      run: ./scripts/use_uv_python.sh
 
     - name: Build
-      run: plz build //src/...
+      run: ./pleasew build //src/...
 
     - name: Test
-      run: plz test //src/...
+      run: ./pleasew test //src/...
