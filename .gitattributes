@@ -1,0 +1,6 @@
+# Files that Linux tools (Please, sh) read must keep LF line endings on Windows too.
+*.sh text eol=lf
+pleasew text eol=lf
+.plzconfig text eol=lf
+.python-version text eol=lf
+BUILD text eol=lf
