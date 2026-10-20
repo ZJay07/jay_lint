@@ -25,8 +25,26 @@ class TestTsLineLength(unittest.TestCase):
         code = "const text = `a very long template literal that goes past the limit`;\n"
         self.assertEqual(self.lint_code(code), [])
 
-    def test_long_comment_is_ignored(self):
+    def test_long_full_line_comment_is_reported_because_it_can_be_wrapped(self):
         code = "// a very long comment that goes past the limit of forty chars\n"
+        self.assertIn(
+            "Line 1: Line exceeds the maximum line length of 40 characters.",
+            self.lint_code(code),
+        )
+
+    def test_long_jsdoc_continuation_line_is_reported(self):
+        code = "/**\n * a very long comment that goes past the limit of forty chars\n */\n"
+        self.assertIn(
+            "Line 2: Line exceeds the maximum line length of 40 characters.",
+            self.lint_code(code),
+        )
+
+    def test_long_trailing_comment_is_ignored(self):
+        code = "const a = 1; // a very long trailing comment past the limit of forty\n"
+        self.assertEqual(self.lint_code(code), [])
+
+    def test_long_directive_comment_is_ignored(self):
+        code = "// eslint-disable-next-line some-very-long-rule-name another-rule-name\n"
         self.assertEqual(self.lint_code(code), [])
 
     def test_long_url_line_is_ignored(self):

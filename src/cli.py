@@ -1,7 +1,10 @@
 import argparse
+import fnmatch
+import os
 import sys
 from pathlib import Path
 
+from src.config import ConfigError, find_config, read_config
 from src.lexing.logic.lexing import JayLinter
 
 TS_SUFFIXES = {'.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'}
@@ -70,7 +73,7 @@ def lint_typescript(file_path, fix, max_line_length):
     print_messages(messages)
     return messages
 
-def collect_files(paths):
+def collect_files(paths, exclude=(), base='.'):
     """Expand directories into the TypeScript/JavaScript files inside them."""
     files = []
     for path in paths:
@@ -81,29 +84,74 @@ def collect_files(paths):
                     if found.suffix in TS_SUFFIXES
                     and found.is_file()
                     and not SKIPPED_DIRECTORIES.intersection(found.relative_to(path).parts)
+                    and not is_excluded(found, exclude, base)
                 )
             )
         else:
             files.append(path)
     return files
 
+def is_excluded(file_path, patterns, base):
+    """True if any `exclude` pattern matches the file's path or one of its folder names."""
+    if not patterns:
+        return False
+    relative = Path(os.path.relpath(file_path, base))
+    candidates = [relative.as_posix(), *relative.parts]
+    return any(fnmatch.fnmatch(candidate, pattern)
+               for pattern in patterns for candidate in candidates)
+
+def load_settings(config_option):
+    """Returns (settings, config_directory), or raises ConfigError."""
+    if config_option:
+        if not os.path.isfile(config_option):
+            raise ConfigError(f"config file '{config_option}' not found.")
+        settings = read_config(config_option)
+        found = (config_option, settings or {})
+    else:
+        found = find_config(os.getcwd())
+    if found is None:
+        return {}, os.getcwd()
+    return found[1], os.path.dirname(os.path.abspath(found[0]))
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='jlint', description='Python and TypeScript linter')
-    parser.add_argument('files', nargs='+', type=str, help='Files or directories to lint')
+    parser.add_argument('files', nargs='*', type=str,
+                        help='Files or directories to lint (default: "paths" from the config)')
     parser.add_argument('--fix', action='store_true', help="Automatically fix the code")
-    parser.add_argument('--max-line-length', type=int, default=100,
-                        help='Maximum line length for TypeScript/JavaScript files (default: 100)')
+    parser.add_argument('--max-line-length', type=int, default=None,
+                        help='Maximum line length for TypeScript/JavaScript files '
+                             '(default: the config value, or 100)')
     parser.add_argument('--strict', action='store_true',
                         help='Exit with status 1 if any issues or errors are found')
+    parser.add_argument('--config', type=str, default=None,
+                        help='Config file to use (default: jlint.toml or [tool.jlint] in '
+                             'pyproject.toml, searched upwards from the current directory)')
 
     args = parser.parse_args(argv)
 
-    paths = [Path(name) for name in args.files]
+    try:
+        settings, config_dir = load_settings(args.config)
+    except ConfigError as error:
+        print(f"Error: {error}")
+        return 2
+
+    if args.files:
+        paths = [Path(name) for name in args.files]
+    else:
+        paths = [Path(config_dir) / name for name in settings.get('paths', [])]
+    if not paths:
+        print("Error: No files given, and no 'paths' in a jlint.toml or [tool.jlint] section.")
+        return 2
+
+    max_line_length = args.max_line_length or settings.get('max-line-length', 100)
+    strict = args.strict or settings.get('strict', False)
+    exclude = settings.get('exclude', [])
+
     missing = [path for path in paths if not path.exists()]
     for path in missing:
         print(f"Error: File '{path}' not found.")
 
-    files = collect_files([path for path in paths if path.exists()])
+    files = collect_files([path for path in paths if path.exists()], exclude, config_dir)
     show_headers = len(files) > 1 or any(path.is_dir() for path in paths)
     problems = len(missing)
 
@@ -113,12 +161,12 @@ def main(argv=None):
         if file_path.suffix == '.py':
             problems += len(lint_python(file_path, args.fix))
         elif file_path.suffix in TS_SUFFIXES:
-            problems += len(lint_typescript(file_path, args.fix, args.max_line_length))
+            problems += len(lint_typescript(file_path, args.fix, max_line_length))
         else:
             print(f"Error: '{file_path}' is not a supported file (.py, .ts, .tsx, .js, .jsx).")
             problems += 1
 
-    return 1 if args.strict and problems else 0
+    return 1 if strict and problems else 0
 
 if __name__ == '__main__':
     sys.exit(main())

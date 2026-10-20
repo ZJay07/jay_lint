@@ -36,6 +36,7 @@ jlint app/page.tsx                      # one file
 jlint app components lib                # directories (node_modules, .next, plz-out skipped)
 jlint --fix components/Bio.tsx          # fix in place
 jlint --strict --max-line-length 88 app # exit 1 if anything is reported (for CI)
+jlint                                   # no arguments: use the paths from the config file
 ```
 
 Checks (`--fix` can fix the ones marked *fix*):
@@ -45,11 +46,34 @@ Checks (`--fix` can fix the ones marked *fix*):
 | Import order and blank lines between import groups (builtin, external, `@/` internal, parent, sibling, index; alphabetised) | *fix* |
 | Unused imports (default, named, aliased, namespace; side-effect imports are never unused) | *fix* |
 | Trailing whitespace, repeated or leading blank lines, final newline | *fix* |
-| Line length (`--max-line-length`, default 100). Lines containing a string, template literal, comment, regex or URL are not reported | |
+| Line length (`--max-line-length`, default 100). Whole-line `//` comments and ` * ` JSDoc lines that are too long are reported and `--fix` wraps them at word boundaries (keeping indent and prefix). Lines with a string, template literal, regex, URL, trailing comment, tool directive (`eslint-...`, `@ts-...`, `prettier-ignore`) or aligned columns are not reported, since they cannot be wrapped safely | *fix* (comments) |
 
 The import order rules mirror `eslint-plugin-import`'s `import/order` with
 `alphabetize` and `newlines-between: always`, so the two agree. Imports are only reordered
 when nothing but imports sits between them; a comment between two imports leaves them alone.
+
+# Config file
+Put your settings in `jlint.toml`, or under `[tool.jlint]` in `pyproject.toml`, and run plain `jlint`.
+The nearest config is found by searching upwards from the current directory
+(`jlint.toml` wins over `pyproject.toml`), or pass one with `--config path/to/file.toml`.
+
+```toml
+# jlint.toml
+paths = ["app", "components", "lib", "utils"]   # linted when no files are given on the command line
+max-line-length = 88                            # TypeScript / JavaScript (default 100)
+strict = true                                   # exit 1 if anything is reported
+exclude = ["generated", "*.stories.tsx"]        # folder names or paths to skip inside directories
+```
+
+The same settings in `pyproject.toml`:
+```toml
+[tool.jlint]
+paths = ["src"]
+```
+
+`paths` and `exclude` are relative to the config file. Command-line arguments override the
+config: files on the command line replace `paths`, and `--max-line-length` replaces
+`max-line-length`. Unknown settings and wrong types are reported as errors.
 
 # Development (Please)
 Tests run under Please, pinned to the Python in `.python-version` (currently 3.11) so local and CI match.

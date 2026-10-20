@@ -1,11 +1,22 @@
+import re
 from dataclasses import dataclass, field
 
 import tree_sitter_typescript as tst
 from tree_sitter import Language, Parser
 
 # Lines touching these nodes are not reported as too long (like ESLint's
-# ignoreStrings / ignoreTemplateLiterals / ignoreComments / ignoreRegExpLiterals).
-LONG_LINE_EXEMPT_NODES = {'string', 'template_string', 'comment', 'regex'}
+# ignoreStrings / ignoreTemplateLiterals / ignoreRegExpLiterals). Comments are exempt too,
+# except whole-line comments, which --fix can wrap (see _wrappable_comment_rows).
+LONG_LINE_EXEMPT_NODES = {'string', 'template_string', 'regex'}
+
+# `// text` (but not `///`) and the ` * text` lines inside a /** */ block.
+LINE_COMMENT = re.compile(r'^(\s*//(?!/) ?)(.*)$')
+BLOCK_COMMENT_LINE = re.compile(r'^(\s*\*(?!/) ?)(.*)$')
+# Comment text starting like this is an instruction for another tool; wrapping would break it.
+DIRECTIVE_PREFIXES = (
+    'eslint', '@ts-', '@jsx', 'prettier-ignore', 'jlint', 'istanbul', 'c8 ', 'webpack',
+    'tslint', '#',
+)
 
 # Node's built-in modules, used to group imports (eslint-plugin-import "builtin").
 BUILTIN_MODULES = {
@@ -210,8 +221,38 @@ class TsLinter:
         elif len(self.source_lines) > 1 and not self.source_lines[-1].strip():
             self._report(len(self.source_lines), 'File should end with a single newline.')
 
+    def _wrappable_comment_rows(self):
+        """Map row -> (prefix, text) for whole-line comments that can be wrapped.
+
+        That is a `// text` line on its own, or a ` * text` line inside a block comment.
+        Directives, lines with URLs, trailing comments and the `/* ... */` first line
+        are left out, since wrapping them would change their meaning.
+        """
+        rows = {}
+        for node in self._walk():
+            if node.type != 'comment':
+                continue
+            first, last = node.start_point[0], node.end_point[0]
+            if first == last:
+                line = self.source_lines[first]
+                match = LINE_COMMENT.match(line)
+                candidates = [(first, match)] if match and line.strip() == self._text(node).strip() else []
+            else:
+                candidates = [(row, BLOCK_COMMENT_LINE.match(self.source_lines[row]))
+                              for row in range(first + 1, last + 1)]
+            for row, match in candidates:
+                if not match:
+                    continue
+                prefix, text = match.groups()
+                if (not text.strip() or text.startswith(DIRECTIVE_PREFIXES)
+                        or re.search(r'https?://', text) or '  ' in text.strip()):
+                    continue
+                rows[row] = (prefix, text)
+        return rows
+
     def check_line_length(self):
-        exempt = self._rows_covered_by(LONG_LINE_EXEMPT_NODES)
+        comment_rows = self._rows_covered_by({'comment'}) - set(self._wrappable_comment_rows())
+        exempt = self._rows_covered_by(LONG_LINE_EXEMPT_NODES) | comment_rows
         for row, line in enumerate(self.source_lines):
             if len(line) <= self.max_line_length or row in exempt:
                 continue
@@ -304,6 +345,32 @@ class TsLinter:
         if edits:
             self._apply_edits(edits)
 
+    @staticmethod
+    def _wrap_comment(prefix, text, width):
+        """Greedy word wrap. A word longer than the width gets a line of its own."""
+        lines, current = [], ''
+        for word in text.split():
+            if current and len(prefix) + len(current) + 1 + len(word) > width:
+                lines.append(prefix + current)
+                current = word
+            else:
+                current = f'{current} {word}' if current else word
+        lines.append(prefix + current)
+        return lines
+
+    def fix_long_comments(self):
+        wrappable = self._wrappable_comment_rows()
+        lines, changed = [], False
+        for row, line in enumerate(self.source_lines):
+            if row in wrappable and len(line) > self.max_line_length:
+                prefix, text = wrappable[row]
+                lines.extend(self._wrap_comment(prefix, text, self.max_line_length))
+                changed = True
+            else:
+                lines.append(line)
+        if changed:
+            self._load('\n'.join(lines) + ('\n' if self.has_final_newline else ''))
+
     def fix_whitespace(self):
         protected = self._rows_covered_by({'template_string'})
         lines, previous_blank = [], True  # starting True drops leading blank lines
@@ -326,6 +393,7 @@ class TsLinter:
         """Fix what can be fixed and return the new source text."""
         self.fix_unused_imports()
         self.fix_import_order()
+        self.fix_long_comments()
         self.fix_whitespace()
         self.source_code = self.source_code.replace('\n', self.newline)
         return self.source_code
