@@ -49,7 +49,10 @@ echo "Releasing jay_lint $version to $target"
 echo "-> Checking git state"
 [ "$(git branch --show-current)" = "main" ] || fail "switch to main first (git checkout main)"
 # Tracked changes only: untracked files do not end up in the build.
-git diff --quiet && git diff --cached --quiet || fail "you have uncommitted changes"
+# core.autocrlf=true makes git compare with line endings normalised. Without it, running
+# from WSL on a folder checked out by Windows git reports every CRLF file as modified.
+git -c core.autocrlf=true diff --quiet && git -c core.autocrlf=true diff --cached --quiet \
+  || fail "you have uncommitted changes (see: git status)"
 git fetch --quiet origin --tags
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] \
   || fail "main is not in sync with origin/main (git pull)"
