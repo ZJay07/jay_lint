@@ -109,3 +109,13 @@ python_test(
         "//src:cli",
     ],
 )
+
+python_test(
+    name = "cli_config_tests",
+    srcs = ["test/test_cli_config.py"],
+    deps = [
+        ":lexing",
+        ":ts_linter",
+        "//src:cli",
+    ],
+)
