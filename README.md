@@ -30,11 +30,7 @@ jlint --fix <test.py>
 
 # TypeScript / JavaScript support
 `jlint` also lints `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` files. It parses them with
-[tree-sitter](https://tree-sitter.github.io/), which is an optional install:
-```bash
-pip install "jay_lint[ts]"
-```
-
+[tree-sitter](https://tree-sitter.github.io/) (installed with the package; needs Python 3.9+):
 ```bash
 jlint app/page.tsx                      # one file
 jlint app components lib                # directories (node_modules, .next, plz-out skipped)
