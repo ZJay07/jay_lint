@@ -12,6 +12,7 @@ class JayLinter(ast.NodeVisitor):
         self.messages = []
         self.import_lines = []
         self.imported_names = set()
+        self.bound_names = {}
         self.used_names = set()
         self.function_args = {}
         self.unused_imports = set()
@@ -42,17 +43,22 @@ class JayLinter(ast.NodeVisitor):
         self.generic_visit(node)
         self.current_class = None
 
+    def _register_import(self, full_name, bound_name):
+        self.imported_names.add(full_name)
+        self.bound_names.setdefault(full_name, set()).add(bound_name)
+
     def visit_Import(self, node):
         for alias in node.names:
             self.import_lines.append((alias.name, node.lineno))
-            self.imported_names.add(alias.name)
+            self._register_import(alias.name, alias.asname or alias.name.split('.')[0])
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node):
         for alias in node.names:
             full_name = f"{node.module}.{alias.name}" if node.module else alias.name
             self.import_lines.append((full_name, node.lineno))
-            self.imported_names.add(full_name)
+            if node.module != '__future__' and alias.name != '*':
+                self._register_import(full_name, alias.asname or alias.name)
         self.generic_visit(node)
 
     def visit_Name(self, node):
@@ -88,7 +94,10 @@ class JayLinter(ast.NodeVisitor):
                 self.messages.append(f"Line {i} is empty.")
 
     def check_unused_imports(self):
-        self.unused_imports = self.imported_names - self.used_names
+        self.unused_imports = {
+            name for name in self.imported_names
+            if self.bound_names[name].isdisjoint(self.used_names)
+        }
         for name in self.unused_imports:
             lineno = next(line for (imp, line) in self.import_lines if imp == name)
             self.messages.append(f"Import '{name}' on line {lineno} is not used.")
