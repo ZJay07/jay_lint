@@ -22,6 +22,14 @@ python_test(
 )
 
 python_test(
+    name = "test_import_usage",
+    srcs = ["test/test_import_usage.py"],
+    deps = [
+        ":lexing",
+    ],
+)
+
+python_test(
     name = "test_trailing_white_spaces",
     srcs = ["test/test_trailing_white_spaces.py"],
     deps = [
